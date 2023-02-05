@@ -7,7 +7,7 @@ class ObjectDetection:
         print("Running opencv dnn with YOLOv4")
         self.nmsThreshold = 0.4
         self.confThreshold = 0.5
-        self.image_size = 608
+        self.image_size = 1280
 
         # Load Network
         net = cv2.dnn.readNet(weights_path, cfg_path)
