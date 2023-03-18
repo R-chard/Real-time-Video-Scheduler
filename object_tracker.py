@@ -7,10 +7,11 @@ from object_detection import ObjectDetection
 from multiprocessing.managers import BaseManager
 from scheduler import Scheduler
 from shared_frames import SharedFrames
+from timeit import default_timer as timer
 import util
 import config
 
-CHANGE_THRESHOLD = 6
+CHANGE_THRESHOLD = 5
 
 class ObjectTracker():
 
@@ -40,11 +41,8 @@ class ObjectTracker():
         # frames_appeared[i] = all classes so far: how many times it appeared for frame i
         self.frames_appeared = [{} for _ in range(videoCount)]
 
-        # self.values = (content, change, disruption)
+        # self.values = (content, change, disruption, overall)
         self.values = []
-
-        # extract file name
-        self.file_name = stream_files[0][stream_files[0].rindex("/")+1:stream_files[0].rindex(".")]
 
         # Used in the calculation of disruption
         if config.REAL_TIME:
@@ -83,13 +81,20 @@ class ObjectTracker():
 
     # Processing a single frame
     def run(self):
+        start = timer()
         stream_id, frame, frame_id, frame_diff = self.scheduler.get_frame_data()
+        
         # Stream is done
         if frame_id == -2:
             return False
         # Waiting on stream to update
         if frame.size == 0:
             return True
+        end = timer()
+        print("Time taken for choice: " + str(end-start))
+        stream_height, stream_width,_ = frame.shape
+
+        start2 = timer()
 
         if config.REAL_TIME:
             print("Frame ID: " + str(frame_id))
@@ -102,6 +107,18 @@ class ObjectTracker():
 
         # Object detection
         obj_ids, confidences, bboxes = self.od.detect(frame)
+
+        # if config.HAS_DISPLAY:
+        #     for bbox in bboxes:
+        #         bbox = tuple(bbox)
+        #         x,y,w,h = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+        #         cv2.rectangle(frame,(x,y),(x+w,y+h),(0, 0, 255), 2, 1)
+        #     cv2.putText(frame, "Frame: " + str(frame_id),(50,50),0,1,(0,0,255), 2)
+        #     cv2.imshow("Frame", frame)
+        #     key = cv2.waitKey(1)
+        #     if key == 27:
+        #         return False
+        #     return True
 
         # ------ Run on previously tracked objects ------------
         # Check all bounding boxes discovered by existing trackers
@@ -121,31 +138,37 @@ class ObjectTracker():
                 if config.HAS_DISPLAY:
                     cv2.rectangle(frame,(x,y),(x+w,y+h),(150, 150, 120), 2, 1)
 
-            found_by_dnn = False
+            max_iou = 0
+            max_j = -1
+
             # Update tracker if DNN returns a slightly different location
             for j in range(len(bboxes)):
 
                 # Ignore background objects
                 obj_id = obj_ids[j].item()
-                if obj_id not in self.objs_of_interest[stream_id] or j in to_ignore:
+                if obj_id not in self.objs_of_interest[stream_id] or j in to_ignore or self.prevPos[tracker][2] != obj_id:
                     continue
                 
-                to_ignore.add(j)
-                bbox = tuple(bboxes[j])         
-                if util.ifCentreIntersect(bbox, tracked_bbox) and self.prevPos[tracker][2] == obj_id:
-                    tracker.init(frame,bbox)
+                bbox = tuple(bboxes[j])
+                iou = util.calcIOU(bbox, tracked_bbox)    
+                if iou > max_iou:
+                    max_j = j
+                    max_iou = iou
 
-                    # Update data based on new tracked locations
-                    speed = util.calcSpeed(bbox, self.prevPos[tracker][0], frame_diff)
-                    obj_details.append([bbox,speed,confidences[j].item(),obj_id])
-                    self.prevPos[tracker] = [bbox, False, obj_id]
-                    found_by_dnn = True
-                    break
+            # Object detected
+            if max_j != -1:
 
-            # object detected or persisted
-            if found_by_dnn or not self.prevPos[tracker][1]:
+                # Update data based on new tracked locations
+                bbox = tuple(bboxes[max_j])
+                obj_id = obj_ids[max_j].item()
+                speed = util.calcSpeed(bbox, self.prevPos[tracker][0], frame_diff)
+                tracker.init(frame, bbox)
+                self.prevPos[tracker] = [bbox, False, obj_id]
+                obj_details.append([bbox,speed,confidences[max_j].item(),obj_id])
+                to_ignore.add(max_j)
+
                 if config.HAS_DISPLAY:
-                    found.append((tracked_bbox,False))
+                    found.append((bbox,False))
 
                 existing_trackers.append(tracker)
                 bbox,_,obj_id = self.prevPos[tracker]
@@ -162,11 +185,8 @@ class ObjectTracker():
                     if obj_id not in self.frames_appeared[stream_id]:
                         self.frames_appeared[stream_id][obj_id] = 0
                     self.frames_appeared[stream_id][obj_id] += 1
-
-                if not found_by_dnn:
-                    self.prevPos[tracker][1] = True
             else:
-                # Remove tracker if dnn has missed more than 2x consecutively
+                # Remove tracker if dnn has missed
                 del self.prevPos[tracker]
         self.trackers[stream_id] = existing_trackers
 
@@ -182,7 +202,7 @@ class ObjectTracker():
                 found.append((bboxes[i], True))
 
             # Create trackers for new object
-            tracker = cv2.TrackerKCF_create()
+            tracker = cv2.TrackerMOSSE_create()
             bbox = tuple(bboxes[i])
             tracker.init(frame,bbox)
             self.prevPos[tracker] = [bbox, False, obj_id]
@@ -211,11 +231,11 @@ class ObjectTracker():
             content_value = util.calcContentValue(present_entities, self.frames_appeared[stream_id], frame_id+1, frame_id+1)
 
             # Calculate change value
-            change_value = util.calcChangeValue(new_entities, present_entities, obj_details)
-            self.values.append([content_value,change_value,0])
+            change_value = util.calcChangeValue(new_entities, present_entities, obj_details, stream_width, stream_height)
+            self.values.append([content_value,change_value,0,0])
 
             # Calculate disruption value
-            curr_frame = {"bboxes": [(dets[0],dets[3]) for dets in obj_details], "frame": frame}
+            curr_frame = {"bboxes": [(tuple(bboxes[i]),obj_ids[i]) for i in range(len(bboxes))], "frame": frame}
             self.frame_details[frame_id] = curr_frame
             past_frame_id = frame_id - 2*self.sampling_rate
 
@@ -226,15 +246,19 @@ class ObjectTracker():
                 disrupted_value = util.calcDisruptionValue(self.frame_details[past_frame_id], self.frame_details[disrupted_frame_id], curr_frame_details)
                 
                 self.values[disrupted_frame_id][2] = disrupted_value
+                total_value = util.calcValue(self.values[disrupted_frame_id][0],self.values[disrupted_frame_id][1],disrupted_value)
+                self.values[disrupted_frame_id][3] = total_value
 
-                print("For frame ID: " + str(disrupted_frame_id))
+                # print("For frame ID: " + str(disrupted_frame_id))
                 # print("Content value: " + str(self.values[disrupted_frame_id][0]))
                 # print("Change value: " + str(self.values[disrupted_frame_id][1]))
-                print("Disruption value: " + str(disrupted_value))
+                # print("Disruption value: " + str(disrupted_value))
                 
                 del self.frame_details[past_frame_id]
-    
-        self.scheduler.update(stream_id, frame_id, new_entities, obj_details)
+
+        end2 = timer()
+        print("Time taken for DNN usage: " + str(end2-start2))
+        self.scheduler.update(stream_id, frame_id, new_entities, present_entities, obj_details)
 
         if config.HAS_DISPLAY:
             return self.show_res(frame, frame_id, found)

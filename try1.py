@@ -33,6 +33,8 @@ def plot_result(points):
     speeds = [0 for _ in range(len(points))]
     confidences = [0 for _ in range(len(points))]
     occlusion_percents = [0 for _ in range(len(points))]
+    xs = [0 for _ in range(len(points))]
+    ys = [0 for _ in range(len(points))]
 
     for i in range(len(points)):
         disruption[i] = points[i][0]
@@ -78,6 +80,7 @@ while capture.isOpened():
         break
     dim = config.get_resized_dim(frame)
     frame = cv2.resize(frame, dim, interpolation= cv2.INTER_AREA)
+    screen_height, screen_width, _ = frame.shape
     obj_ids, confidences, bboxes = od.detect(frame)
 
     already_tracked = set()
@@ -88,6 +91,9 @@ while capture.isOpened():
 
     count = 0
     totals = [0,0,0,0]
+
+    crowd_x = 0
+    crowd_y = 0
 
     for i in range(len(trackers)):
         _,tracked_bbox = trackers[i].update(frame)
@@ -125,6 +131,19 @@ while capture.isOpened():
             bbox = tuple(bboxes[max_j])
             obj_id = obj_ids[max_j].item()
             speed_x,speed_y = util.calcSpeed(prevPos[trackers[i]][0], bbox, 1)
+            centre_x = bbox[0] + bbox[2]/2
+            centre_y = bbox[1] + bbox[3]/2
+
+            if centre_x < screen_width/2:
+                crowd_x += speed_x
+            else:
+                crowd_x -= speed_x
+
+            if centre_y < screen_height/2:
+                crowd_y += speed_y
+            else:
+                crowd_y -= speed_y
+
             speed = (speed_x**2 + speed_y**2)**0.5
             size = bbox[2] * bbox[3]
             occlusion_percent = util.percent_occluded(bbox,bboxes)

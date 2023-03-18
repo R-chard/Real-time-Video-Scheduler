@@ -15,6 +15,6 @@ COPY ./*.py ./
 COPY requirements.txt ./
 COPY media/* ./media/
 COPY dnn_model/* ./dnn_model/
-RUN mkdir res/
+RUN pip install -r requirements.txt
 
-CMD [ "python", "./main.py", "gpu" ]
+CMD [ "python3", "./main.py"]

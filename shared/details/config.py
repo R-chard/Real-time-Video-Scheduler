@@ -3,8 +3,11 @@ import os
 
 REAL_TIME = False
 HAS_DISPLAY = False
-RES_DIR = "res"
+SCHEDULER_MODE = "prio" # can be prio, rr or edf
+SHARED_DIR = "shared"
+DETAILS_DIR = "details"
 MEDIA_DIR = "media"
+RESULTS_DIR = "output"
 SCREEN_MAX_WIDTH = 1280
 SCREEN_MAX_HEIGHT = 720
 REGRESSION_MODEL_PATH = "multiple_regression.sav"
@@ -24,10 +27,10 @@ def get_resized_dim(frame):
     return (width,height)
 
 def save_regression_model(model):
-    file_path = os.path.join(RES_DIR, REGRESSION_MODEL_PATH)
+    file_path = os.path.join(SHARED_DIR, DETAILS_DIR, REGRESSION_MODEL_PATH)
     pickle.dump(model, open(file_path, "wb"))
 
 def load_regression_model():
-    file_path = os.path.join(RES_DIR, REGRESSION_MODEL_PATH)
+    file_path = os.path.join(SHARED_DIR, DETAILS_DIR, REGRESSION_MODEL_PATH)
     return pickle.load(open(file_path, "rb"))
     

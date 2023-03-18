@@ -1,5 +1,20 @@
 Build image:
-docker build --build-arg local_uid=$(id -u) --build-arg local_user=$USER -t diss .
+docker build -f docker/Dockerfile --build-arg local_uid=$(id -u) --build-arg local_user=$USER -t diss .
 
-Run:
-docker run --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 --runtime=nvidia --user $(id -u):$(id -g) --rm -it diss bash
+Run scheduler:
+docker run --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 --runtime=nvidia --user $(id -u):$(id -g) -v ~/dissertation/shared:/home/$USER/shared --rm -it diss
+
+Run bash in container:
+docker run --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 --runtime=nvidia --user $(id -u):$(id -g) -v ~/dissertation/shared:/home/$USER/shared --rm -it diss bash
+
+Run scheduler in container: 
+python3 ./main.py gpu rt
+
+Run regression file ( run in bash environment within container):
+python3 regression.py
+
+Run frame_extractor:
+python3 frame_extrctor.py
+
+
+
