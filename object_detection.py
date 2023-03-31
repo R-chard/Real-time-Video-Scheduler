@@ -2,16 +2,13 @@ import cv2
 import numpy as np
 
 class ObjectDetection:
-    def __init__(self, weights_path="dnn_model/yolov41.weights", cfg_path="dnn_model/yolov41.cfg"):
-        print("Loading Object Detection")
-        print("Running opencv dnn with YOLOv4")
+    def __init__(self, weights_path="dnn_model/yolov7.weights", cfg_path="dnn_model/yolov7.cfg"):
         self.nmsThreshold = 0.4
         self.confThreshold = 0.5
         self.image_size = 1280
 
         # Load Network
         net = cv2.dnn.readNet(weights_path, cfg_path)
-
         # Enable GPU CUDA
         net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
         net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)

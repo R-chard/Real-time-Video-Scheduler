@@ -16,5 +16,4 @@ COPY requirements.txt ./
 COPY media/* ./media/
 COPY dnn_model/* ./dnn_model/
 RUN pip install -r requirements.txt
-
-CMD [ "python3", "./main.py"]
+CMD [ "python3", "./controller.py"]

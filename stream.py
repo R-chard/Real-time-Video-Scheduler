@@ -1,11 +1,10 @@
 from multiprocessing import Process
 import cv2
-import numpy as np
 import time
 import config
 import os
 
-# Represents a single video stream
+# Simulates a video stream
 class Stream(Process):
     def __init__(self,id,stream_file, shared_frames):
         super(Stream,self).__init__()
@@ -17,8 +16,14 @@ class Stream(Process):
     def run(self):
         file_path = os.path.join(config.MEDIA_DIR, self.stream_file)
         capture = cv2.VideoCapture(file_path)
-        self.fps = capture.get(cv2.CAP_PROP_FPS) / 15
-        print("Initializing stream " + self.stream_file + " of length " + str(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + " with a fps of " + str(self.fps))
+        self.fps = capture.get(cv2.CAP_PROP_FPS) * config.FPS_SCALE
+        stream_length = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.shared_frames.set_stream_length(self.id, stream_length)
+        stream_width = capture.get(cv2.CAP_PROP_FRAME_WIDTH)
+        stream_height = capture.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        self.shared_frames.set_frame_dim(self.id, stream_width, stream_height)
+
+        print("Initializing stream " + self.stream_file + " of length " + str(stream_length) + " with a fps of " + str(self.fps))
 
         first_frame = True
         while capture.isOpened():
@@ -31,21 +36,17 @@ class Stream(Process):
             frame = cv2.resize(frame, dim, interpolation= cv2.INTER_AREA)
             self.shared_frames.set_frame(self.id, frame, self.frame_no, self.fps)
 
-            if config.REAL_TIME:
-                time.sleep(1/self.fps)
-            else:
-                # Only process when done
+            if not config.REAL_TIME or first_frame:
+                first_frame = False
+                # Bug with first frame taking extra long for detector to set up
                 while not self.shared_frames.isFrameEmpty(self.id):
                     continue
-            
-            # Bug with first frame taking extra long for detector
-            if first_frame:
-                time.sleep(10/self.fps)
-                first_frame = False
+
+            else:
+                time.sleep(1/self.fps)
             self.frame_no += 1
             
         # Indicates that stream is done running
-        self.shared_frames.set_frame(self.id, np.empty(0), -2, self.fps)
-
+        self.shared_frames.end_stream(self.id, self.fps)
         print(self.stream_file + " stream ended")
         capture.release()

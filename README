@@ -1,19 +1,20 @@
 Build image:
 docker build -f docker/Dockerfile --build-arg local_uid=$(id -u) --build-arg local_user=$USER -t diss .
 
-Run scheduler:
-docker run --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 --runtime=nvidia --user $(id -u):$(id -g) -v ~/dissertation/shared:/home/$USER/shared --rm -it diss
-
 Run bash in container:
 docker run --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 --runtime=nvidia --user $(id -u):$(id -g) -v ~/dissertation/shared:/home/$USER/shared --rm -it diss bash
 
-Run scheduler in container: 
-python3 ./main.py gpu rt
+Run scheduler in bash within container: 
+python3 ./controller.py
 
-Run regression file ( run in bash environment within container):
-python3 regression.py
+Train regression model in bash environment within container:
+python3 iou_confidence.py
 
-Run frame_extractor:
+Run scheduler:
+docker run --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 --runtime=nvidia --user $(id -u):$(id -g) -v ~/dissertation/shared:/home/$USER/shared --rm -it diss
+Configuration file can be modified in between runs
+
+Run frame_extractor ( on machine with display ):
 python3 frame_extrctor.py
 
 

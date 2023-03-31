@@ -10,8 +10,8 @@ import numpy as np
 from object_detection import ObjectDetection
 from sklearn.linear_model import LinearRegression
 
-# File trains a multi regressoin model
-vid_file = "full_traffic.mp4"
+# File trains a linear regression model to be used by the stateful scheduler
+vid_file = "moving_traffic.mp4"
 capture = cv2.VideoCapture(os.path.join(config.MEDIA_DIR, vid_file))
 print("Initializing stream " + vid_file + " of length " + str(capture.get(cv2.CAP_PROP_FRAME_COUNT)) + " frames.")
 size_to_iou = []
@@ -33,7 +33,7 @@ def plot_result(points, title, desc):
     y_points = np.array(y_points)
     gradient, c = np.polyfit(x_points,y_points,1)
 
-    plt.ylabel("MOSSE prediction accuracy")
+    plt.ylabel("MOSSE prediction accuracy (IOU)")
     plt.xlabel(desc)
     plt.scatter(x_points, y_points)
     
@@ -51,7 +51,7 @@ def build_regression_model(points):
     model = LinearRegression()
     reg = model.fit(factors,tracked_iou)
 
-    print("Factors arranged in order of: Speed, Size, Confidence")
+    print("Factors arranged in order of: Speed, Size, Confidence, Occlusion")
     print("Coefficient of regression model: " + str(reg.coef_))
     print("Score of regression model: " + str(reg.score(factors, tracked_iou)))
 
@@ -63,7 +63,6 @@ while capture.isOpened():
         break
     dim = config.get_resized_dim(frame)
     frame = cv2.resize(frame, dim, interpolation= cv2.INTER_AREA)
-    screen_height, screen_width = frame.shape
     obj_ids, confidences, bboxes = od.detect(frame)
 
     already_tracked = set()
@@ -92,12 +91,13 @@ while capture.isOpened():
                 iou = util.calcIOU(tracked_bbox, bbox)
 
                 speed_x,speed_y = util.calcSpeed(prevPos[trackers[i]][0], bbox, 1)
-                speed = round((speed_x**2 + speed_y**2)**0.5,1)
+                speed = (speed_x**2 + speed_y**2)**0.5
                 
                 size = bbox[2] * bbox[3]
                 occlusion_percent = util.percent_occluded(bbox,bboxes)
 
-                data_points.append([iou,[speed,size,confidence,occlusion_percent]])
+                #data_points.append([iou,[speed,size,confidence,occlusion_percent]])
+                data_points.append([iou,[speed]])
 
                 # Update results
                 speed_to_iou.append((iou,speed))
@@ -125,18 +125,12 @@ while capture.isOpened():
         bbox = tuple((bboxes[i][0], bboxes[i][1], bboxes[i][2], bboxes[i][3]))
         new_tracker = cv2.TrackerKCF_create()
         new_tracker.init(frame, bbox)
-        #cv2.rectangle(frame,(bbox[0],bbox[1]),(bbox[0]+ bbox[2],bbox[1]+bbox[3]),(0, 0, 255), 2, 1)
         prevPos[new_tracker] = [bbox, obj_ids[i].item()]
         trackers.append(new_tracker)
     frame_id += 1
 
-    # cv2.imshow("frame", frame)
-    # key = cv2.waitKey(0)
-    # if key == 27:
-    #     break
-
-plot_result(size_to_iou, "size", "Size of object")
-plot_result(speed_to_iou, "speed", "Speed of object")
+plot_result(size_to_iou, "size", "Size of object (pixels)")
+plot_result(speed_to_iou, "speed", "Speed of object (pixels/frame)")
 plot_result(confidence_to_iou, "confidence", "Confidence of DNN")
 plot_result(occlusion_percent_to_iou, "occlusion", "Percentage of object occluded")
 build_regression_model(data_points)

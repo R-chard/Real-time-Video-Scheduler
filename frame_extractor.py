@@ -1,14 +1,15 @@
-# Run individually to extract frame given frame number
+# Run program individually to display the frame given frame number
+# Format: python3 frame_extractor.py <video_name> <file>
 import cv2
 import sys
 import os
+sys.path.insert(1,"./shared/details")
 import config
 
-# To use: python3 frame_extractor.py <stream name> <frame_number>
 if __name__ == "__main__":
 
     stream, frame_no = sys.argv[1], int(sys.argv[2])
-    stream_path = os.path.join("./media",stream)
+    stream_path = os.path.join(config.MEDIA_DIR,stream)
 
     cap = cv2.VideoCapture(stream_path)
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_no)

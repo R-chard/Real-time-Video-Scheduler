@@ -1,14 +1,20 @@
-# new.mp4
-# 0,1,2,3
-# moving_traffic.mp4
-# 2
-# still_traffic.mp4
-# 2
-# varying_traffic.mp4
-# 2
-# full_traffic.mp4
-# 2
+# vid set 1
+# 
 rare_bike.mp4
 2,3
-# blocking_car.mp4
-# 2,3,7
+varying_traffic.mp4
+2,7
+still_traffic.mp4
+2,7
+moving_traffic.mp4
+2,7
+# vid set 2
+#
+# MOT17-01-raw.webm
+# 0
+# MOT17-08-raw.webm
+# 0
+# MOTS20-02-raw.webm
+# 0
+# MOT20-07-raw.mp4
+# 0
